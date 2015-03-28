@@ -19,12 +19,18 @@
 // 500ms = Fast Reverse
 // 200ms = Brake
 
+Servo servo_TopMotor;
 Servo servo_RightMotor;
 Servo servo_LeftMotor;
-I2CEncoder encoder_RightMotor;
+
+
+I2CEncoder encoder_TopMotor;
 I2CEncoder encoder_LeftMotor;
+I2CEncoder encoder_RightMotor;
+
 
 // -------------------- SENSORS --------------------
+const int TOP_MOTOR_PIN = 4;
 const int RIGHT_MOTOR_PIN = 2;
 const int LEFT_MOTOR_PIN = 3;
 
@@ -39,37 +45,35 @@ const int ULTRASONIC_OUT_PIN_BACK = 49;
 
 // -------------------- VARIABLES --------------------
 
+unsigned long echo_time[2];//0 is front timer, 1 is back timer
+
 unsigned int Left_Motor_Speed;
 unsigned int Right_Motor_Speed;
 unsigned int Right_Motor_Stop = 1500;
 unsigned int Left_Motor_Stop = 1500;
-
 long leftEncoderStopTime = 0;
 long rightEncoderStopTime = 0;
-boolean val = false;
-int Left_Motor_Offset = -50;
-int Right_Motor_Offset = 50;
+boolean loopStarted = false;// start loop for turning
+int Left_Motor_Offset = 0;
+int Right_Motor_Offset = 25;
 
 unsigned long time_previous = 0; // Used for time functions, do not change
 unsigned long time_elapsed = 0; // Used for time functions, do not change
 boolean can_start_waiting = false; // Used for time functions, do not change
 
-// -------------------- STEP COUNTER --------------------
-// NOTE: Step 0 is reserved for debugging
 
-unsigned int step = 0;
 
-// Tin's Wall-following Attempt
-const int setPoint = 720;
+// -------------------- PID --------------------
+const float setPoint = 700; // 15cm
+const float dSensors = 2700;
+const float speedConstant = 200;
 
-const int pConstant = 5;
-const int iConstant = 0;
-const int dConstant = 0;
+// -------------------- STAGE COUNTER --------------------
+// NOTE: Stage 0 is reserved for debugging
 
-int output = 0;
-int currentReading = 0;
-int lastReading = 0;
-int integral = 0;
+
+unsigned int stage = 0;
+
 
 // ******************************************************************
 // ************************* PROGRAM !SETUP *************************
@@ -80,14 +84,18 @@ void setup() {
   Serial.begin(9600);
 
   // Set-up motors
+
+  pinMode(TOP_MOTOR_PIN, OUTPUT);
   pinMode(LEFT_MOTOR_PIN, OUTPUT);
   servo_LeftMotor.attach(LEFT_MOTOR_PIN);
   pinMode(RIGHT_MOTOR_PIN, OUTPUT);
   servo_RightMotor.attach(RIGHT_MOTOR_PIN);
 
+
   // Set-up buttons
-  pinMode(FRONT_TOP_LEVER_SWITCH_PIN, INPUT);
-  pinMode(FRONT_BOTTOM_LEVER_SWITCH_PIN, INPUT);
+
+  pinMode(FRONT_TOP_LEVER_SWITCH_PIN, INPUT_PULLUP);
+  pinMode(FRONT_BOTTOM_LEVER_SWITCH_PIN, INPUT_PULLUP);
 
   digitalWrite(FRONT_TOP_LEVER_SWITCH_PIN, HIGH);
   digitalWrite(FRONT_BOTTOM_LEVER_SWITCH_PIN, HIGH);
@@ -100,125 +108,136 @@ void setup() {
   pinMode(ULTRASONIC_IN_PIN_BACK, OUTPUT);
 
 
+
   //Set up encoder
-  encoder_LeftMotor.init(1.0 / 3.0*MOTOR_393_SPEED_ROTATIONS, MOTOR_393_TIME_DELTA);
+  encoder_LeftMotor.init(1.0 / 3.0 * MOTOR_393_SPEED_ROTATIONS, MOTOR_393_TIME_DELTA);
   encoder_LeftMotor.setReversed(false); // adjust for positive count when moving forward
-  encoder_RightMotor.init(1.0 / 3.0*MOTOR_393_SPEED_ROTATIONS, MOTOR_393_TIME_DELTA);
+  encoder_RightMotor.init(1.0 / 3.0 * MOTOR_393_SPEED_ROTATIONS, MOTOR_393_TIME_DELTA);
   encoder_RightMotor.setReversed(true); // adjust for positive count when moving forward
 
   encoder_LeftMotor.zero();
   encoder_RightMotor.zero();
+  encoder_TopMotor.zero();
 }
 
 // *****************************************************************
 // ************************* PROGRAM !LOOP *************************
 // *****************************************************************
-void loop(){
+void loop() {
 
-  switch (step){
+  switch (stage) {
 
     // ==================== CASE 1-10 ====================
 
-  case 0:
-    // RESERVED FOR TESTING, PASTE CODE HERE AND SET STEP = 0
-    backUp();
-    break;
+    case 0:
+      // RESERVED FOR TESTING, PASTE CODE HERE AND SET STAGE = 0
+      turnLeftAngle(360);
+            stage++;
+      break;
 
-  case 1:
-    // Find the wall first
-    moveForward(100);
-    if(hitTable){
-      setNeutral();
-      step = 3;
-    }
-    else if (hitWall){
-      setNeutral();
-      step = 2;
-    }
-    break;
+    case 1:
+      // Case status: DONE by Daniel
+      // Start case: Robot is in the middle of the room
+      moveForward(300);
+      if(hitWall()){
+        backUp();
+        stage = 30;
+      }
+      break;
+      // End case: Robot is parallel to the wall
 
-  case 2:
+    case 2:
       // Start case: Wall is in front of robot, robot is parallel to it
-    moveForward(300);
-    if (hitWall()){
-      step++;
-    }
-    // End case: Robot is hit the wall
-    break;
-  case 3:
+          
+      // End case: Robot is hit the wall
+      break;
 
+    case 3:
+      break;
 
-  case 4:
+    case 4:
+      break;
 
-  case 5:
+    case 5:
+      break;
 
-  case 6:
+    case 6:
+      break;
 
-  case 7:
+    case 7:
+      break;
 
-  case 8:
+    case 8:
+      break;
 
-  case 9:
+    case 9:
+      break;
 
-  case 10:
+    case 10:
+      break;
+
 
     // ==================== CASE 11-20 ====================
 
-  case 11:/*
-    // Start case: Robot is parallel to the wall
-    smartMoveForward();
-    if (hitTable()){
-      backUp();
-      pivotCounterClockwise();
-      step = 5; // !NOTICE: fix this, Jump to the case where you're at the table
-    }
-    else if(hitWall()){
-      backUp();
-      pivotCounterClockwise();
-    }
+    case 11:
+      break;
 
-    // End case: In front of the table
-    */
     case 12:
-    servo_LeftMotor.writeMicroseconds(1800);
-    servo_RightMotor.writeMicroseconds(1900);
-    ping();
+      break;
 
-  case 13:
+    case 13:
+      break;
 
-  case 14:
+    case 14:
+      break;
 
-  case 15:
+    case 15:
+      break;
 
-  case 16:
+    case 16:
+      break;
 
-  case 17:
+    case 17:
+      break;
 
-  case 18:
+    case 18:
+      break;
 
-  case 19:
+    case 19:
+      break;
 
-  case 20:
+    case 20:
+      break;
 
     // ==================== CASE 21-30 ====================
 
-  case 21:
+    case 21:
+      break;
 
-  case 22:
+    case 22:
+      break;
 
-  case 23:
+    case 23:
+      break;
 
-  case 24:
+    case 24:
+      break;
 
-  case 25:
+    case 25:
+      break;
 
-  case 26:
+    case 26:
+      break;
 
-  case 27:
+    case 27:
+      break;
 
-  case 28:
+    case 28:
+      break;
 
-  case 29:
+    case 29:
+      break;
+
 
   case 30:
     break;
@@ -237,23 +256,23 @@ void loop(){
 
 // Ping ultrasonic
 // Send the Ultrasonic Range Finder a 10 microsecond pulse per tech spec
-int ping(){
-}
 
-int frontPing(){
+int frontPing() {
   //Front ultrasonic
   digitalWrite(ULTRASONIC_IN_PIN_FRONT, HIGH);
   delayMicroseconds(10); //The 10 microsecond pause where the pulse in "high"
   digitalWrite(ULTRASONIC_IN_PIN_FRONT, LOW);
-  unsigned long ping_time = pulseIn(ULTRASONIC_OUT_PIN_FRONT, HIGH, 10000);
+
+  unsigned long ping_time;
+  echo_time[0] = pulseIn(ULTRASONIC_OUT_PIN_FRONT, HIGH, 10000);
 
   Serial.print("cm: ");
-  Serial.print(ping_time / 58); //divide time by 58 to get
+  Serial.println(echo_time[0] / 58); //divide time by 58 to get
 
   return ping_time;
 }
 
-int backPing(){
+int backPing() {
   //Back ultrasonic
   digitalWrite(ULTRASONIC_IN_PIN_BACK, HIGH);
   delayMicroseconds(10); //The 10 microsecond pause where the pulse in "high"
@@ -261,48 +280,102 @@ int backPing(){
 
   // Use command pulseIn to listen to ultrasonic_Data pin to record the
   // time that it takes from when the Pin goes HIGH until it goes LOW
+
   unsigned long ping_time = pulseIn(ULTRASONIC_OUT_PIN_BACK, HIGH, 10000);
 
-  // Print Sensor Readings
-  //Serial.print("Time (microseconds): ");
-  //Serial.print(echo_time[0], DEC);
-  //distance in cm
+
   Serial.print("cm: ");
   Serial.println(ping_time / 58); //divide time by 58 to get distance in cm
-
   return ping_time;
+
+}
+
+
+void getEncoderPos()
+{
+                        Serial.print("Rot: ");
+			Serial.println(encoder_TopMotor.getRawPosition());
+			Serial.print("Encoders L: ");
+			Serial.print(encoder_LeftMotor.getRawPosition());
+			Serial.print(", R: ");
+			Serial.print(encoder_RightMotor.getRawPosition());
+			
+
 }
 
 boolean hitTable() {
-  if (FRONT_BOTTOM_LEVER_SWITCH_PIN==LOW && FRONT_TOP_LEVER_SWITCH_PIN==HIGH)
+  int bottom_lever = digitalRead(FRONT_BOTTOM_LEVER_SWITCH_PIN);
+  int top_lever = digitalRead(FRONT_TOP_LEVER_SWITCH_PIN);
+  if ((bottom_lever == LOW) && (top_lever == HIGH)){
+    Serial.println("Table");
     return true;
-  else
+  }
+  else{
+    Serial.println("Nothing");
     return false;
+  }
 }
 
 boolean hitWall() {
-  if (FRONT_BOTTOM_LEVER_SWITCH_PIN==LOW && FRONT_TOP_LEVER_SWITCH_PIN==LOW)
+  int bottom_lever = digitalRead(FRONT_BOTTOM_LEVER_SWITCH_PIN);
+  int top_lever = digitalRead(FRONT_TOP_LEVER_SWITCH_PIN);
+  if ((top_lever == LOW) && (bottom_lever == LOW)){
+    Serial.println("Wall");
     return true;
-  else
+
+  }
+  else{
+    Serial.println("Nothing");
     return false;
+  }
+
 }
 
 
 // -------------------- MOVEMENT FUNCTIONS --------------------
 
-void followWall() // Follows the wall while repositioning self
-{
-  if(frontPing() > 612)
-  {
-    pivotRight(100);
-  }
-  else if(frontPing () < 496)
-  {
-   pivotLeft(100);
-  }
-  else
-   moveForward(200);
+
+// Smart movement functions
+void allOfTin(){
+  currentReading = frontPing(); // update reading
+  integral += currentReading; // add reading to integral
+
 }
+
+// Forward and reverse movement functions
+void turnLeftAngle(long angle)
+{
+    calcLeftTurn(2000, angle);     
+    
+    while (!doneLeftTurn())
+    {
+      turnLeftOnSpot(200); 
+    } 
+    setNeutral();
+}
+
+void turnRightAngle(long angle)
+{
+    calcRightTurn(2000, angle);     
+    
+    while (!doneRightTurn())
+    {
+      turnRightOnSpot(200); 
+    } 
+    setNeutral();
+}
+void moveForwardFixed(){
+  Left_Motor_Speed = 1700;
+  Right_Motor_Speed = 1700;
+  implementMotorSpeed();
+}
+
+void moveBackwardsFixed(){
+  Left_Motor_Speed = 1300;
+  Right_Motor_Speed = 1300;
+  implementMotorSpeed();
+}
+
 
 void moveForward(long speedFactor)
 {
@@ -313,25 +386,31 @@ void moveForward(long speedFactor)
 
 void moveBackwards(long speedFactor)
 {
-  Left_Motor_Speed = constrain((Left_Motor_Stop - speedFactor), 1500, 2100);
-  Right_Motor_Speed = constrain((Right_Motor_Stop - speedFactor), 1500, 2100);
+  Left_Motor_Speed = constrain((Left_Motor_Stop - speedFactor), 900, 1500);
+  Right_Motor_Speed = constrain((Right_Motor_Stop - speedFactor), 900, 1500);
   implementMotorSpeed();
 }
-
 void moveBackDistance(long distance)
 {
   leftEncoderStopTime = encoder_LeftMotor.getRawPosition();
-  while(leftEncoderStopTime + distance > encoder_LeftMotor.getRawPosition())
+  while (leftEncoderStopTime + distance > encoder_LeftMotor.getRawPosition())
   {
     Left_Motor_Speed = constrain((Left_Motor_Stop - 300), 1500, 2100);
     Right_Motor_Speed = constrain((Right_Motor_Stop - 300), 1500, 2100);
     implementMotorSpeed();
   }
+
 }
 
-void backUp(){
-  moveBackDistance(10);
+void backUp() {
+  setNeutral();
+  delay(1000);
+  moveBackwardsFixed();
+  delay(1500);
+  setNeutral();
 }
+
+// Turn functions
 
 void veerRight(long speedFactor, long intensity)
 {
@@ -347,14 +426,13 @@ void veerLeft(long speedFactor, long intensity)
   implementMotorSpeed();
 }
 
-// Pivoting will turn the robot 90 degrees without moving
-void pivotLeft(long speedFactor)
+void turnLeftOnSpot(long speedFactor)
 {
   Left_Motor_Speed = constrain((Left_Motor_Stop - speedFactor), 900, 1500);
   Right_Motor_Speed = constrain((Right_Motor_Stop + speedFactor), 1500, 2100);
   implementMotorSpeed();
 }
-void pivotRight(long speedFactor)
+void turnRightOnSpot(long speedFactor)
 {
   Left_Motor_Speed = constrain((Left_Motor_Stop + speedFactor), 1500, 2100);
   Right_Motor_Speed = constrain((Right_Motor_Stop - speedFactor), 900, 1500);
@@ -385,64 +463,57 @@ boolean doneRightTurn()
   else
     return false;
 }
+
+void turnClockwise(long speedFactor) {
+  Left_Motor_Speed = constrain((Left_Motor_Stop + speedFactor), 1500, 2100);
+  Right_Motor_Speed = Left_Motor_Stop;
+  implementMotorSpeed();
+}
+
+void pivotLeft() {
+
+}
+
+void pivotRight() {
+}
+
+// Implementation movement functions
+
 void implementMotorSpeed()
 {
   servo_LeftMotor.writeMicroseconds(constrain((Left_Motor_Speed + Left_Motor_Offset), 900, 2100));
   servo_RightMotor.writeMicroseconds(constrain((Right_Motor_Speed + Right_Motor_Offset), 900, 2100));
 }
 
-void setNeutral(){
+void setNeutral() {
   Left_Motor_Speed = 1500;
   Right_Motor_Speed = 1500;
   implementMotorSpeed();
 
 }
 
-void brake(){
+void brake() {
   Left_Motor_Speed = 200;
   Right_Motor_Speed = 200;
   implementMotorSpeed();
 }
 
 
-
-// Turning will turn the robot 90 degrees with slight movement
-// !NOTICE Need to test and fix these functions
-void turnCounterClockwise() {
-  servo_LeftMotor.writeMicroseconds(1500);
-  servo_RightMotor.writeMicroseconds(1500);
-  delay(200);
-  servo_LeftMotor.writeMicroseconds(1250);
-  servo_RightMotor.writeMicroseconds(1750);
-  delay(1500);
-  setNeutral();
-  delay(200);
-
-}
-
-void turnClockwise() {
-  servo_LeftMotor.writeMicroseconds(1500);
-  servo_RightMotor.writeMicroseconds(1500);
-  delay(200);
-  servo_RightMotor.writeMicroseconds(1250);
-  servo_LeftMotor.writeMicroseconds(1750);
-  delay(1500);
-  setNeutral();
-  delay(200);
-}
-
 // -------------------- TIME FUNCTIONS --------------------
 
+
 // Call startWaiting first, and then waitMilliSecond
-void startWaiting(){
-  if(can_start_waiting){
+void startWaiting() {
+  if (can_start_waiting) {
+
     time_previous = millis();
   }
 }
 
-boolean waitMilliSecond(unsigned int interval){
+boolean waitMilliSecond(unsigned int interval) {
+
   time_elapsed = millis();
-  if ((time_elapsed - time_previous) > interval){
+  if ((time_elapsed - time_previous) > interval) {
     can_start_waiting = false;
     return true; // Done waiting!
   }
@@ -453,14 +524,20 @@ boolean waitMilliSecond(unsigned int interval){
 
 void allOfTin()
 {
-	ping();
-	currentReading = echo_time[0];
+  // find perpendicualr distance to closer ultrasonic sensor with delay to prevent interference
+  float frontReading = (float)frontPing();
+  delay(3);
+  float backReading = (float)backPing();
+  delay(3);
 
-	output = pConstant*(currentReading - Setpoint) + iConstant*integral + pConstant*(currentReading - lastReading);
-	lastReading = currentReading;
+  // update smaller perpendicular distance (ultrasonic that is closer)
+  if (frontReading < backReading)
+    currentReading = (frontReading * dSensors)/(sqrt((float)dSensors * dSensors + (frontReading - backReading) * (frontReading - backReading)));
+  else
+    currentReading = (backReading * dSensors)/(sqrt((float)dSensors * dSensors + (frontReading - backReading) * (frontReading - backReading)));
 
-	if(output > 0)
-		veerRight(200,abs(output));
-	else if(output < 0)
-		veerLeft(200,abs(output));
+  // update angle
+  
 }
+
+
