@@ -64,16 +64,9 @@ boolean can_start_waiting = false; // Used for time functions, do not change
 
 
 // -------------------- PID --------------------
-const int setPoint = 720;
-
-const int pConstant = 5;
-const int iConstant = 0;
-const int dConstant = 0;
-
-int output = 0;
-int currentReading = 0;
-int lastReading = 0;
-int integral = 0;
+const float setPoint = 700; // 15cm
+const float dSensors = 2700;
+const float speedConstant = 200;
 
 // -------------------- STAGE COUNTER --------------------
 // NOTE: Stage 0 is reserved for debugging
@@ -527,6 +520,24 @@ boolean waitMilliSecond(unsigned int interval) {
   else {
     return false; // Not done waiting!
   }
+}
+
+void allOfTin()
+{
+  // find perpendicualr distance to closer ultrasonic sensor with delay to prevent interference
+  float frontReading = (float)frontPing();
+  delay(3);
+  float backReading = (float)backPing();
+  delay(3);
+
+  // update smaller perpendicular distance (ultrasonic that is closer)
+  if (frontReading < backReading)
+    currentReading = (frontReading * dSensors)/(sqrt((float)dSensors * dSensors + (frontReading - backReading) * (frontReading - backReading)));
+  else
+    currentReading = (backReading * dSensors)/(sqrt((float)dSensors * dSensors + (frontReading - backReading) * (frontReading - backReading)));
+
+  // update angle
+  
 }
 
 
